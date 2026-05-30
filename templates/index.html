@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HeadMark - 发际线蒙板生成</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background: #0f0f1a;
+            color: #e0e0e0;
+            font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif;
+            min-height: 100vh;
+        }
+        header {
+            background: #1a1a2e;
+            padding: 16px 24px;
+            border-bottom: 1px solid #2a2a4a;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        header h1 { font-size: 20px; font-weight: 600; }
+        header .seg-mode {
+            font-size: 12px;
+            padding: 4px 10px;
+            border-radius: 12px;
+            background: #2a4a2a;
+            color: #8f8;
+        }
+
+        .controls {
+            background: #1a1a2e;
+            padding: 16px 24px;
+            border-bottom: 1px solid #2a2a4a;
+            display: flex;
+            align-items: center;
+            gap: 24px;
+            flex-wrap: wrap;
+        }
+
+        /* Upload area */
+        .upload-area {
+            border: 2px dashed #3a3a5a;
+            border-radius: 8px;
+            padding: 12px 24px;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-align: center;
+            min-width: 200px;
+        }
+        .upload-area:hover, .upload-area.dragover {
+            border-color: #6a6aff;
+            background: rgba(106, 106, 255, 0.05);
+        }
+        .upload-area input { display: none; }
+        .upload-area .label { font-size: 14px; color: #888; }
+
+        /* Threshold slider */
+        .slider-group {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex: 1;
+            min-width: 300px;
+        }
+        .slider-group label { font-size: 14px; white-space: nowrap; }
+        .slider-group input[type="range"] {
+            flex: 1;
+            height: 6px;
+            -webkit-appearance: none;
+            background: #2a2a4a;
+            border-radius: 3px;
+            outline: none;
+        }
+        .slider-group input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: #6a6aff;
+            cursor: pointer;
+        }
+        .slider-group .value {
+            font-size: 16px;
+            font-weight: 600;
+            color: #6a6aff;
+            min-width: 36px;
+            text-align: center;
+        }
+
+        /* Download buttons */
+        .download-group {
+            display: flex;
+            gap: 8px;
+        }
+        .btn {
+            padding: 8px 16px;
+            border: 1px solid #3a3a5a;
+            border-radius: 6px;
+            background: #1e1e36;
+            color: #ccc;
+            cursor: pointer;
+            font-size: 13px;
+            transition: all 0.2s;
+        }
+        .btn:hover { background: #2a2a4a; border-color: #6a6aff; color: #fff; }
+        .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+        /* Visualization grid */
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 12px;
+            padding: 16px 24px;
+        }
+        @media (max-width: 1200px) { .grid { grid-template-columns: repeat(3, 1fr); } }
+        @media (max-width: 800px) { .grid { grid-template-columns: repeat(2, 1fr); } }
+
+        .panel {
+            background: #16162a;
+            border-radius: 8px;
+            overflow: hidden;
+            border: 1px solid #2a2a4a;
+        }
+        .panel .title {
+            padding: 8px 12px;
+            font-size: 13px;
+            font-weight: 600;
+            background: #1e1e36;
+            border-bottom: 1px solid #2a2a4a;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .panel .title .step-num {
+            color: #6a6aff;
+            font-size: 11px;
+        }
+        .panel .img-wrap {
+            position: relative;
+            min-height: 150px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #0a0a16;
+        }
+        .panel .img-wrap img {
+            width: 100%;
+            display: block;
+            cursor: pointer;
+        }
+        .panel .img-wrap .placeholder {
+            color: #444;
+            font-size: 13px;
+        }
+
+        /* Loading overlay */
+        .loading {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.7);
+            z-index: 100;
+            justify-content: center;
+            align-items: center;
+        }
+        .loading.active { display: flex; }
+        .spinner {
+            width: 48px;
+            height: 48px;
+            border: 4px solid #2a2a4a;
+            border-top-color: #6a6aff;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* Lightbox */
+        .lightbox {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.9);
+            z-index: 200;
+            cursor: zoom-out;
+            justify-content: center;
+            align-items: center;
+        }
+        .lightbox.active { display: flex; }
+        .lightbox img {
+            max-width: 95vw;
+            max-height: 95vh;
+            object-fit: contain;
+        }
+
+        /* Error toast */
+        .toast {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: #4a1a1a;
+            color: #ff8888;
+            padding: 12px 20px;
+            border-radius: 8px;
+            border: 1px solid #6a2a2a;
+            font-size: 14px;
+            z-index: 300;
+            transform: translateX(120%);
+            transition: transform 0.3s;
+        }
+        .toast.active { transform: translateX(0); }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>HeadMark - 发际线蒙板生成</h1>
+        <span class="seg-mode" id="seg-mode"></span>
+    </header>
+
+    <div class="controls">
+        <div class="upload-area" id="upload-area">
+            <input type="file" id="file-input" accept="image/*">
+            <div class="label">点击或拖拽上传照片</div>
+        </div>
+
+        <div class="slider-group">
+            <label>黑色阈值:</label>
+            <input type="range" id="threshold" min="0" max="255" value="115" disabled>
+            <span class="value" id="threshold-value">115</span>
+        </div>
+
+        <div class="slider-group">
+            <label>膨胀半径:</label>
+            <input type="range" id="dilation" min="0" max="5" step="0.1" value="1.0" disabled>
+            <span class="value" id="dilation-value">1.0%</span>
+            <span class="value" id="dilation-px" style="color:#aaa;font-size:12px;min-width:50px;"></span>
+        </div>
+
+        <div class="download-group">
+            <button class="btn" id="btn-dl-contour" disabled onclick="downloadMask('contour')">
+                下载轮廓蒙板
+            </button>
+            <button class="btn" id="btn-dl-hull" disabled onclick="downloadMask('hull')">
+                下载凸包蒙板
+            </button>
+        </div>
+    </div>
+
+    <div class="grid">
+        <!-- Row 1: Steps 4-5 + Final -->
+        <div class="panel">
+            <div class="title">
+                黑色像素检测
+                <span class="step-num">Step 4</span>
+            </div>
+            <div class="img-wrap">
+                <img id="img-step4" style="display:none" onclick="showLightbox(this)">
+                <span class="placeholder">-</span>
+            </div>
+        </div>
+        <div class="panel">
+            <div class="title">
+                轮廓蒙板
+                <span class="step-num">Step 5a</span>
+            </div>
+            <div class="img-wrap">
+                <img id="img-step5a" style="display:none" onclick="showLightbox(this)">
+                <span class="placeholder">-</span>
+            </div>
+        </div>
+        <div class="panel">
+            <div class="title">
+                凸包蒙板
+                <span class="step-num">Step 5b</span>
+            </div>
+            <div class="img-wrap">
+                <img id="img-step5b" style="display:none" onclick="showLightbox(this)">
+                <span class="placeholder">-</span>
+            </div>
+        </div>
+        <div class="panel">
+            <div class="title">
+                二值蒙板预览
+                <span class="step-num">Final</span>
+            </div>
+            <div class="img-wrap" style="background: #000;">
+                <img id="img-final" style="display:none" onclick="showLightbox(this)">
+                <span class="placeholder">-</span>
+            </div>
+        </div>
+
+        <!-- Row 2: Original + Steps 1-3 -->
+        <div class="panel">
+            <div class="title">原始照片</div>
+            <div class="img-wrap">
+                <img id="img-original" style="display:none" onclick="showLightbox(this)">
+                <span class="placeholder" id="ph-original">等待上传...</span>
+            </div>
+        </div>
+        <div class="panel">
+            <div class="title">
+                关键点 & 上半区
+                <span class="step-num">Step 1</span>
+            </div>
+            <div class="img-wrap">
+                <img id="img-step1" style="display:none" onclick="showLightbox(this)">
+                <span class="placeholder">-</span>
+            </div>
+        </div>
+        <div class="panel">
+            <div class="title">
+                头部分割
+                <span class="step-num">Step 2</span>
+            </div>
+            <div class="img-wrap">
+                <img id="img-step2" style="display:none" onclick="showLightbox(this)">
+                <span class="placeholder">-</span>
+            </div>
+        </div>
+        <div class="panel">
+            <div class="title">
+                交集区域
+                <span class="step-num">Step 3</span>
+            </div>
+            <div class="img-wrap">
+                <img id="img-step3" style="display:none" onclick="showLightbox(this)">
+                <span class="placeholder">-</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading overlay -->
+    <div class="loading" id="loading">
+        <div>
+            <div class="spinner"></div>
+            <div style="margin-top:16px; text-align:center; font-size:14px;">处理中...</div>
+        </div>
+    </div>
+
+    <!-- Lightbox -->
+    <div class="lightbox" id="lightbox" onclick="hideLightbox()">
+        <img id="lightbox-img">
+    </div>
+
+    <!-- Error toast -->
+    <div class="toast" id="toast"></div>
+
+    <script>
+        const fileInput = document.getElementById('file-input');
+        const uploadArea = document.getElementById('upload-area');
+        const threshold = document.getElementById('threshold');
+        const thresholdValue = document.getElementById('threshold-value');
+        const dilation = document.getElementById('dilation');
+        const dilationValue = document.getElementById('dilation-value');
+        const dilationPx = document.getElementById('dilation-px');
+        const loading = document.getElementById('loading');
+
+        let currentMaskType = 'contour';
+        let lastData = null;
+        let imageWidth = 0;
+        let debounceTimer = null;
+
+        // ── Upload handlers ──
+
+        uploadArea.addEventListener('click', () => fileInput.click());
+
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('dragover');
+        });
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.classList.remove('dragover');
+        });
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+            if (e.dataTransfer.files.length > 0) {
+                handleFile(e.dataTransfer.files[0]);
+            }
+        });
+        fileInput.addEventListener('change', () => {
+            if (fileInput.files.length > 0) {
+                handleFile(fileInput.files[0]);
+            }
+        });
+
+        async function handleFile(file) {
+            if (!file.type.startsWith('image/')) {
+                showToast('请上传图片文件');
+                return;
+            }
+
+            showLoading();
+            const formData = new FormData();
+            formData.append('file', file);
+
+            try {
+                const resp = await fetch('/upload', { method: 'POST', body: formData });
+                if (!resp.ok) {
+                    const err = await resp.json();
+                    throw new Error(err.detail || '上传失败');
+                }
+                const data = await resp.json();
+                lastData = data;
+                updateAllPanels(data);
+
+                // Enable controls
+                threshold.disabled = false;
+                dilation.disabled = false;
+                document.getElementById('btn-dl-contour').disabled = false;
+                document.getElementById('btn-dl-hull').disabled = false;
+
+                // Store image width and update dilation pixel display
+                imageWidth = data.image_width || 0;
+                updateDilationDisplay();
+
+                // Show segmentation mode
+                document.getElementById('seg-mode').textContent =
+                    '分割模型: ' + data.seg_mode;
+
+                // Update upload area text
+                uploadArea.querySelector('.label').textContent =
+                    file.name + ' (点击更换)';
+            } catch (e) {
+                showToast(e.message);
+            } finally {
+                hideLoading();
+            }
+        }
+
+        // ── Sliders ──
+
+        function scheduleAdjust() {
+            clearTimeout(debounceTimer);
+            debounceTimer = setTimeout(() => {
+                doAdjust(parseInt(threshold.value), parseFloat(dilation.value));
+            }, 200);
+        }
+
+        threshold.addEventListener('input', (e) => {
+            thresholdValue.textContent = e.target.value;
+            scheduleAdjust();
+        });
+
+        dilation.addEventListener('input', (e) => {
+            updateDilationDisplay();
+            scheduleAdjust();
+        });
+
+        function updateDilationDisplay() {
+            const pct = parseFloat(dilation.value);
+            dilationValue.textContent = pct.toFixed(1) + '%';
+            if (imageWidth > 0) {
+                const px = Math.max(1, Math.round(imageWidth * pct / 100));
+                dilationPx.textContent = px + 'px';
+            }
+        }
+
+        async function doAdjust(thresholdVal, dilationPct) {
+            try {
+                const resp = await fetch('/adjust', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        threshold: thresholdVal,
+                        dilation_pct: dilationPct
+                    }),
+                });
+                if (!resp.ok) {
+                    const err = await resp.json();
+                    throw new Error(err.detail || '调整失败');
+                }
+                const data = await resp.json();
+                lastData = { ...lastData, ...data };
+                updateThresholdPanels(data);
+            } catch (e) {
+                showToast(e.message);
+            }
+        }
+
+        // ── Panel updates ──
+
+        function setImg(id, src) {
+            const img = document.getElementById(id);
+            const placeholder = img.parentElement.querySelector('.placeholder');
+            img.src = src;
+            img.style.display = 'block';
+            if (placeholder) placeholder.style.display = 'none';
+        }
+
+        function updateAllPanels(data) {
+            setImg('img-original', data.original);
+            setImg('img-step1', data.step1);
+            setImg('img-step2', data.step2);
+            setImg('img-step3', data.step3);
+            updateThresholdPanels(data);
+        }
+
+        function updateThresholdPanels(data) {
+            setImg('img-step4', data.step4);
+            setImg('img-step5a', data.step5a);
+            setImg('img-step5b', data.step5b);
+            // Show contour mask as default final preview
+            setImg('img-final', data.contour_mask);
+        }
+
+        // ── Download ──
+
+        function downloadMask(type) {
+            window.open('/download_mask?type=' + type, '_blank');
+        }
+
+        // ── Lightbox ──
+
+        function showLightbox(imgEl) {
+            document.getElementById('lightbox-img').src = imgEl.src;
+            document.getElementById('lightbox').classList.add('active');
+        }
+        function hideLightbox() {
+            document.getElementById('lightbox').classList.remove('active');
+        }
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') hideLightbox();
+        });
+
+        // ── Loading / Toast ──
+
+        function showLoading() { loading.classList.add('active'); }
+        function hideLoading() { loading.classList.remove('active'); }
+
+        function showToast(msg) {
+            const t = document.getElementById('toast');
+            t.textContent = msg;
+            t.classList.add('active');
+            setTimeout(() => t.classList.remove('active'), 4000);
+        }
+    </script>
+</body>
+</html>
