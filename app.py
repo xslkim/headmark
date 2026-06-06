@@ -1,9 +1,28 @@
+import os
+
 import uvicorn
 from fastapi import FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.responses import HTMLResponse, JSONResponse, Response
 from fastapi.templating import Jinja2Templates
 
 from processor import HeadmarkProcessor
+
+_APIKEY_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "apikey.txt")
+
+
+def _load_api_key() -> str:
+    """Doubao Ark API Key: env DOUBAO_API_KEY first, else apikey.txt."""
+    key = os.environ.get("DOUBAO_API_KEY", "").strip()
+    if key:
+        return key
+    try:
+        with open(_APIKEY_FILE, encoding="utf-8") as f:
+            return f.read().strip()
+    except OSError:
+        return ""
+
+
+DOUBAO_API_KEY: str = _load_api_key()
 
 app = FastAPI(title="HeadMark - 发际线蒙板生成工具")
 templates = Jinja2Templates(directory="templates")
@@ -20,8 +39,9 @@ async def startup():
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
     return templates.TemplateResponse(
+        request,
         "index.html",
-        {"request": request, "seg_mode": processor.use_head_seg},
+        {"seg_mode": processor.use_head_seg},
     )
 
 
@@ -35,7 +55,12 @@ async def upload(file: UploadFile = File(...)):
         raise HTTPException(status_code=400, detail="文件为空")
 
     try:
-        result = processor.process(contents, threshold=115, dilation_pct=1.0)
+        result = processor.process(
+            contents,
+            threshold=115,
+            dilation_pct=1.0,
+            doubao_api_key=DOUBAO_API_KEY or None,
+        )
         return JSONResponse(result)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))

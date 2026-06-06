@@ -1,0 +1,17 @@
+# Secrets — never commit
+apikey.txt
+AccessKeyID.txt
+SecretAccessKey.txt
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+venv/
+.venv/
+
+# Generated debug/result images
+image/debug_*.jpg
+image/debug_*.png
+image/result_*.jpg
+image/result_*.png
