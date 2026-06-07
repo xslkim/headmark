@@ -8,7 +8,7 @@ Pillow
 jinja2
 # Doubao Vision（火山引擎方舟）VLM 集成，用于语义定位马克笔标记线
 volcengine-python-sdk[ark]
-# head-segmentation 用于精确头部分割（推荐安装）
-# pip install head-segmentation
-# 如果安装失败，系统会自动回退到 MediaPipe Selfie Segmentation
-head-segmentation
+# head-segmentation 用于精确头部分割（可选，不在 PyPI）
+# 安装命令（依赖走 venv/pip.conf 国内镜像）：
+# pip install git+https://github.com/wiktorlazarski/head-segmentation.git
+# 如果未安装，系统会自动回退到 MediaPipe Selfie Segmentation
