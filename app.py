@@ -20,8 +20,9 @@ async def startup():
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
     return templates.TemplateResponse(
+        request,
         "index.html",
-        {"request": request, "seg_mode": processor.use_head_seg},
+        {"seg_mode": processor.use_head_seg},
     )
 
 
@@ -77,4 +78,4 @@ async def download_mask(type: str = "contour"):
 
 
 if __name__ == "__main__":
-    uvicorn.run("app:app", host="0.0.0.0", port=8002, reload=True)
+    uvicorn.run("app:app", host="0.0.0.0", port=8888, reload=True)
